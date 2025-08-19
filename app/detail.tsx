@@ -8,22 +8,57 @@ import {
   Button,
   TouchableOpacity,
   Image,
-} from "react-native";
-import { useLocalSearchParams } from "expo-router";
-import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
+  Dimensions,
+  FlatList,
+} from "react-native"
+import { CameraView, useCameraPermissions } from 'expo-camera'
+import { Button as RNButton } from 'react-native-elements'
+import { Ionicons } from '@expo/vector-icons'
+
+// Api
+import {
+  useStoreReadigMutation,
+} from '@/api/reading.api';
+
+// Redux
+import { useSelector } from 'react-redux';
+import { meterSelectors } from '@/store/meter.slice';
+
+// Types
+import { Meter } from '@/types/Meter';
 
 export default function DetailScreen() {
-  const { id } = useLocalSearchParams();
+  const screenWidth = Dimensions.get("window").width;
+
   const [modalVisible, setModalVisible] = useState(false);
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [cameraRef, setCameraRef] = useState<CameraView | null>(null);
   const [photo, setPhoto] = useState<string | null>(null);
   const [number, setNumber] = useState("");
+  const [meterSelected, setMeterSelected] = useState<Meter | null>(null);
+
+  const [storeReading, storeReadingResult] = useStoreReadigMutation()
+
+  useEffect(() => {
+    if (storeReadingResult.isSuccess) {
+      console.log("Reading stored successfully:", storeReadingResult.data);
+      setModalVisible(false);
+      setPhoto(null);
+      setNumber("");
+    }
+
+    if (storeReadingResult.isError) {
+      console.error("Error storing reading:", storeReadingResult.error);
+    }
+  }, [storeReadingResult]);
+
+  // Obtener los medidores del store
+  const meters = useSelector(meterSelectors.selectMeters) as Meter[];
 
   // Pedir permisos de cámara al cargar
   const [permission, requestPermission] = useCameraPermissions();
 
   if (!permission) {
+    // Camera permissions are still loading.
     return <View />;
   }
 
@@ -43,25 +78,47 @@ export default function DetailScreen() {
     }
   };
 
-  if (hasPermission === null) {
-    return <Text>Solicitando permisos de cámara...</Text>;
-  }
-  if (hasPermission === false) {
-    return <Text>No tienes acceso a la cámara</Text>;
-  }
+  const renderItem = ({ item }: { item: Meter }) => (
+    <TouchableOpacity
+      style={[styles.card, { width: screenWidth - 20 }]}
+      onPress={() => {
+        setMeterSelected(item)
+        setModalVisible(true)
+      }}
+    >
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.serial}>{item.serialNumber}</Text>
+          <Text style={styles.brand}>{item.brand}</Text>
+        </View>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Ionicons name="water" size={26} color="#808080" />
+          <Ionicons name="speedometer" size={26} color="#808080" />
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Detalle de la ubicación</Text>
-      <Text>ID: {id}</Text>
+      <Text style={styles.subtitle}>Listado de medidores del predio.</Text>
 
       {/* Ejemplo de caja que abre el modal */}
-      <TouchableOpacity
-        style={styles.card}
-        onPress={() => setModalVisible(true)}
-      >
-        <Text>Registrar medidor</Text>
-      </TouchableOpacity>
+
+      {meters === undefined || meters.length === 0 ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: -80 }}>
+          <Text>No hay medidores disponibles.</Text>
+        </View>
+      ): (
+        <FlatList
+          data={meters ?? []}
+          renderItem={renderItem}
+          keyExtractor={(item: Meter) => item.id}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ padding: 10 }}
+        />
+      )}
 
       {/* Modal tipo bottom sheet */}
       <Modal
@@ -72,7 +129,38 @@ export default function DetailScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Registrar medidor</Text>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <Text style={styles.modalTitle}>Registrar lectura</Text>
+
+              <RNButton
+                title="Guardar"
+                style={{ marginBottom: 15 }}
+                accessibilityLabel="Guardar lectura"
+                onPress={() => {
+                  // Formdata para enviar
+                  const formData = new FormData();
+                  formData.append("meterId", meterSelected?.id ?? "");
+                  formData.append("reading", number);
+                  formData.append("cycle", "A");
+                  formData.append("route", "1");
+                  
+                  if (photo) {
+                    formData.append(
+                      "photo",
+                      {
+                        uri: photo,
+                        type: "image/jpeg",
+                        name: "photo.jpg",
+                      } as unknown as Blob
+                    );
+                  }
+
+                  console.log("Submitting reading:", formData.values);
+
+                  storeReading(formData);
+                }}
+              />
+            </View>
 
             <TextInput
               style={styles.input}
@@ -110,20 +198,27 @@ export default function DetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: "#fff",
+    paddingTop: 20,
+    backgroundColor: "#f8f9fa",
   },
-  title: {
-    fontSize: 22,
+  subtitle: {
+    fontSize: 18,
     fontWeight: "bold",
     marginBottom: 10,
+    marginLeft: 15,
   },
   card: {
-    backgroundColor: "#f0f0f0",
+    backgroundColor: "#fff",
     padding: 20,
-    borderRadius: 10,
-    marginTop: 20,
+    marginBottom: 15,
+    borderRadius: 12,
+    elevation: 3, // sombra en Android
+    shadowColor: "#000", // sombra en iOS
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
   },
+
   modalOverlay: {
     flex: 1,
     justifyContent: "flex-end",
@@ -164,5 +259,15 @@ const styles = StyleSheet.create({
   buttonRow: {
     flexDirection: "row",
     justifyContent: "space-between",
+  },
+  serial: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 6,
+  },
+  brand: {
+    fontSize: 16,
+    fontWeight: "medium",
+    marginBottom: 6,
   },
 });

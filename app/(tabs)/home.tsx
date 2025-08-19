@@ -1,35 +1,63 @@
 import { useRouter } from 'expo-router'
-import { useEffect, useState } from 'react'
-import { View, FlatList, StyleSheet, TouchableOpacity, Dimensions, ActivityIndicator } from "react-native";
+import { useEffect, useMemo, useState, useCallback } from 'react'
+import {
+  View,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  Dimensions,
+  ActivityIndicator,
+} from "react-native";
 import { Text } from "react-native-elements";
-import { useNavigation } from "@react-navigation/native";
+import { Ionicons } from '@expo/vector-icons'
+import { useDispatch } from 'react-redux'
 
-import { isLoggedIn } from '../../lib/auth'
+// Redux
+import { setMeters } from '@/store/meter.slice'
 
-const { height } = Dimensions.get("window");
+// Api
+import {
+  usePropertiesMetersQuery,
+} from '@/api/propety.api';
 
-const data = [
-  { id: "1", name: "Lugar 1", location: "Ciudad A", address: "Calle 123" },
-  { id: "2", name: "Lugar 2", location: "Ciudad B", address: "Avenida 456" },
-  { id: "3", name: "Lugar 3", location: "Ciudad C", address: "Carrera 789" },
-  { id: "4", name: "Lugar 1", location: "Ciudad A", address: "Calle 123" },
-  { id: "5", name: "Lugar 2", location: "Ciudad B", address: "Avenida 456" },
-  { id: "6", name: "Lugar 3", location: "Ciudad C", address: "Carrera 789" },
-  { id: "7", name: "Lugar 1", location: "Ciudad A", address: "Calle 123" },
-  { id: "8", name: "Lugar 2", location: "Ciudad B", address: "Avenida 456" },
-  { id: "9", name: "Lugar 3", location: "Ciudad C", address: "Carrera 789" },
-  { id: "10", name: "Lugar 1", location: "Ciudad A", address: "Calle 123" },
-  { id: "11", name: "Lugar 2", location: "Ciudad B", address: "Avenida 456" },
-  { id: "12", name: "Lugar 3", location: "Ciudad C", address: "Carrera 789" },
-  { id: "13", name: "Lugar 1", location: "Ciudad A", address: "Calle 123" },
-  { id: "14", name: "Lugar 2", location: "Ciudad B", address: "Avenida 456" },
-  { id: "15", name: "Lugar 3", location: "Ciudad C", address: "Carrera 789" },
-];
+// Utils
+import { isLoggedIn } from '@/lib/auth'
+
+// Types
+import { Property } from '@/types/Property';
 
 export default function HomeScreen() {
   const router = useRouter()
+  const dispatch = useDispatch()
   const [checking, setChecking] = useState(true)
   const screenWidth = Dimensions.get("window").width;
+
+  const {
+    data: properties,
+    isLoading,
+    refetch: refetchProperties,
+  } = usePropertiesMetersQuery({});
+
+  const [refreshing, setRefreshing] = useState(false)
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+
+    // Simular una carga (puede ser fetch a API)
+    setTimeout(() => {
+      refetchProperties();
+      setRefreshing(false);
+    }, 1500);
+  }, [refetchProperties]);
+
+  const propetiesList = useMemo(() => {
+    if (!properties) return [];
+    return properties.data.map((property: Property) => ({
+      id: property.id,
+      cadastralRecord: property.cadastralRecord,
+      address: property.address,
+      meters: property.meters || [],
+    }));
+  }, [properties]);
 
   useEffect(() => {
     const validateSession = async () => {
@@ -44,26 +72,44 @@ export default function HomeScreen() {
 
   if (checking) return <ActivityIndicator size="large" style={{ flex: 1 }} />
 
-  const renderItem = ({ item }: { item: typeof data[0] }) => (
+  const renderItem = ({ item }: { item: Property }) => (
     <TouchableOpacity
       style={[styles.card, { width: screenWidth - 20 }]}
-      onPress={() => router.push({ pathname: "/detail", params: { id: item.id } })}
+      onPress={() => {
+        dispatch(setMeters(item.meters))
+        router.push({ pathname: "/detail" })
+      }}
     >
-      <Text style={styles.title}>{item.name}</Text>
-      <Text>{item.location}</Text>
-      <Text>{item.address}</Text>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <View style={{ flex: 1 }}>
+          <Text>{item.meters.length} - Medidores</Text>
+          <Text style={styles.title}>{item.cadastralRecord}</Text>
+          <Text style={styles.subtitle}>{item.address}</Text>
+        </View>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {/* Icono de casa */}
+          <Ionicons name="home" size={26} color="#808080" />
+        </View>
+      </View>
     </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={data}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ padding: 10 }}
-      />
+      {isLoading ? (
+        <ActivityIndicator size="large" color="#808080" style={{ marginTop: 20 }} />
+      ) : (
+        <FlatList
+          data={propetiesList}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ padding: 10 }}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+        />
+      )}
     </View>
   )
 }
@@ -87,6 +133,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: "bold",
+    marginBottom: 6,
+  },
+  subtitle: {
+    fontSize: 16,
+    fontWeight: "medium",
     marginBottom: 6,
   },
 });
