@@ -1,5 +1,7 @@
 import { Tabs } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
+import AntDesign from '@expo/vector-icons/AntDesign';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
+
 
 export default function TabsLayout() {
   return (
@@ -7,18 +9,18 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="home"
         options={{
-          title: 'Inicio',
+          title: 'Leyendo',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" color={color} size={size} />
+            <AntDesign name="scan1" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="clients"
         options={{
-          title: 'Clientes',
+          title: 'Leidos',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="people" color={color} size={size} />
+            <AntDesign name="checkcircleo" size={size} color={color} />
           ),
         }}
       />
@@ -27,7 +29,7 @@ export default function TabsLayout() {
         options={{
           title: 'Perfil',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" color={color} size={size} />
+            <AntDesign name="user" size={size} color={color} />
           ),
         }}
       />

@@ -9,10 +9,11 @@ export const readingsApi = api
     overrideExisting: true,
     endpoints: (builder) => ({
       storeReadig: builder.mutation({
-        query: (readingData) => ({
+        query: (formData: FormData) => ({
           url: "reading",
           method: RequestMethod.POST,
-          body: readingData,
+          body: formData,
+          formData: true,
         }),
       }),
     }),

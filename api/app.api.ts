@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 export const BASE_URL =
   process.env.NODE_ENV === "production"
     ? "https://api.innovusingenieria.com:3001/"
-    : "https://api.innovusingenieria.com:3001/";
+    : "http://192.168.1.19:3001/";
 
 export const api = createApi({
   reducerPath: "api",

@@ -1,4 +1,3 @@
-import { useRouter } from 'expo-router'
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import {
   View,
@@ -8,17 +7,22 @@ import {
   Dimensions,
   ActivityIndicator,
 } from "react-native";
-import { Text } from "react-native-elements";
+import {
+  Text,
+  SearchBar,
+  Button as RNButton,
+} from "react-native-elements";
 import { Ionicons } from '@expo/vector-icons'
-import { useDispatch } from 'react-redux'
-
-// Redux
-import { setMeters } from '@/store/meter.slice'
+import { useRouter } from 'expo-router'
 
 // Api
 import {
   usePropertiesMetersQuery,
 } from '@/api/propety.api';
+import {
+  useActiveReadigSessionQuery,
+  useStoreReadigSessionMutation,
+} from '@/api/reading-session.api'
 
 // Utils
 import { isLoggedIn } from '@/lib/auth'
@@ -26,9 +30,13 @@ import { isLoggedIn } from '@/lib/auth'
 // Types
 import { Property } from '@/types/Property';
 
+// Components
+import PropertyCard from '@/components/PropetyCard';
+
+const { height } = Dimensions.get("window");
+
 export default function HomeScreen() {
   const router = useRouter()
-  const dispatch = useDispatch()
   const [checking, setChecking] = useState(true)
   const screenWidth = Dimensions.get("window").width;
 
@@ -38,11 +46,24 @@ export default function HomeScreen() {
     refetch: refetchProperties,
   } = usePropertiesMetersQuery({});
 
+  const {
+    data: readingSession,
+    isLoading: isLoadingSession,
+  } = useActiveReadigSessionQuery({});
+  const [storeReadigSession, storeReadigSessionResult] = useStoreReadigSessionMutation();
+
+  useEffect(() => {
+    if (readingSession) {
+      console.log(readingSession.isActive);
+    }
+  }, [readingSession]);
+
+  const [search, setSearch] = useState("");
+
   const [refreshing, setRefreshing] = useState(false)
   const onRefresh = useCallback(() => {
     setRefreshing(true);
 
-    // Simular una carga (puede ser fetch a API)
     setTimeout(() => {
       refetchProperties();
       setRefreshing(false);
@@ -59,6 +80,12 @@ export default function HomeScreen() {
     }));
   }, [properties]);
 
+  const [filteredProperties, setFilteredProperties] = useState();
+
+  useEffect(() => {
+    setFilteredProperties(propetiesList);
+  }, [propetiesList])
+
   useEffect(() => {
     const validateSession = async () => {
       if (!(await isLoggedIn())) {
@@ -70,13 +97,25 @@ export default function HomeScreen() {
     validateSession()
   }, [])
 
+  const updateSearch = (text: string) => {
+    setSearch(text);
+    if (text) {
+      const filtered = properties.data.filter((item: Property) =>
+        item.address.toLowerCase().includes(text.toLowerCase())
+      );
+      setFilteredProperties(filtered);
+    } else {
+      setFilteredProperties(properties.data);
+    }
+  };
+
   if (checking) return <ActivityIndicator size="large" style={{ flex: 1 }} />
 
   const renderItem = ({ item }: { item: Property }) => (
     <TouchableOpacity
       style={[styles.card, { width: screenWidth - 20 }]}
       onPress={() => {
-        dispatch(setMeters(item.meters))
+        //dispatch(setMeters(item.meters))
         router.push({ pathname: "/detail" })
       }}
     >
@@ -96,28 +135,93 @@ export default function HomeScreen() {
   );
 
   return (
-    <View style={styles.container}>
-      {isLoading ? (
-        <ActivityIndicator size="large" color="#808080" style={{ marginTop: 20 }} />
-      ) : (
-        <FlatList
-          data={propetiesList}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ padding: 10 }}
-          refreshing={refreshing}
-          onRefresh={onRefresh}
+    readingSession
+      && readingSession.isActive === true ? (
+      <View style={styles.container}>
+        <SearchBar
+          platform="default"
+          placeholder="Buscar propiedad..."
+          onChangeText={updateSearch}
+          value={search}
+          lightTheme
+          round
+          containerStyle={{
+            backgroundColor: "transparent",
+            borderTopWidth: 0,
+            borderBottomWidth: 0,
+          }}
+          inputContainerStyle={{
+            backgroundColor: "#eee",
+          }}
+
+          loadingProps={{}}
+          showLoading={false}
+          onClear={() => setSearch("")}
+          onFocus={() => {}}
+          onBlur={() => {}}
+          onCancel={() => {}}
         />
-      )}
-    </View>
+
+        {isLoading ? (
+          <ActivityIndicator size="large" color="#808080" style={{ marginTop: 20 }} />
+        ) : (
+          <FlatList
+            data={filteredProperties}
+            renderItem={({ item }) => <PropertyCard item={item} />}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ padding: 10 }}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+          />
+        )}
+      </View>
+    ) : (
+      <View style={styles.containerButton}>
+        <RNButton
+          title="Iniciar lectura"
+          loading={isLoadingSession || storeReadigSessionResult.isLoading}
+          titleStyle={{
+            fontWeight: '600',
+            color: '#dde8f0',
+            fontSize: 20,
+          }}
+          buttonStyle={{
+            backgroundColor: 'rgba(0, 69, 129, 1)',
+            borderColor: 'transparent',
+            borderWidth: 0,
+            borderRadius: 20,
+            paddingVertical: 5,
+          }}
+          containerStyle={{
+            width: 300,
+            height: 60,
+            marginHorizontal: 50,
+            marginVertical: 10,
+          }}
+          onPress={() => {
+            storeReadigSession({});
+          }}
+        />
+      </View>
+    )
   )
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#fff",
+  },
+  containerButton: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    height: 1000,
+    backgroundColor: "#fff",
+    paddingTop: (height/2)-120
   },
   card: {
     backgroundColor: "#fff",
